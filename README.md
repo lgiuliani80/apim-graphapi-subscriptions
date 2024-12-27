@@ -55,9 +55,9 @@
 ## Permissions recap
 
 - **User issuing the initial Graph API subscription request**:  
-  - User must have `Mail.Read` delegated permission on `Mail` resource AND must have access to the specificed mailbox
+  - Graph API _Delegated_ permission `Mail.Read` AND must have access to the specificed mailbox
 - **Graph API App Registration**:  
-  - Graph API _Application_ permission on `Mail.Read` on `Mail` resource
+  - Graph API _Application_ permission `Mail.Read`
 - **API Management Managed Identity**:  
   - `Key Vault Secret User` role on the Key Vault where the certificate is stored and necessary permissions on the Event Hub namespace
   - `Azure Event Hubs Data Owner` role on the Event Hub
