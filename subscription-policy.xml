@@ -1,0 +1,43 @@
+<!--
+    Disclaimer
+    The sample scripts are not supported under any Microsoft standard support program or service. The sample scripts are provided AS IS without warranty of any kind. Microsoft further disclaims all implied warranties including, without limitation, any implied warranties of merchantability or of fitness for a particular purpose. The entire risk arising out of the use or performance of the sample scripts and documentation remains with you. In no event shall Microsoft, its authors, or anyone else involved in the creation, production, or delivery of the scripts be liable for any damages whatsoever (including, without limitation, damages for loss of business profits, business interruption, loss of business information, or other pecuniary loss) arising out of the use of or inability to use the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages.
+-->
+
+<policies>
+    <!-- Gestisci la richiesta in ingresso -->
+    <inbound>
+        <base />
+        <!-- Autenticazione con Managed Identity per accedere a Event Hub -->
+        <authentication-managed-identity resource="https://eventhubs.azure.net/" output-token-variable-name="msi-access-token" ignore-error="false" />
+        <!-- Aggiungi l'Authorization header con il token MSI -->
+        <set-header name="Authorization" exists-action="override"><!-- verificare prefisso Bearer -->
+            <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
+        </set-header>
+        <!-- Configura il backend per inviare la richiesta a Event Hub -->
+        <set-backend-service base-url="https://{{EventHub-Namespace}}.servicebus.windows.net/{{EventHub-Name}}/" />
+        <!-- Aggiungi "/messages" al percorso esistente -->
+        <rewrite-uri template="/messages" />
+        <!-- Configura i parametri di query -->
+        <set-query-parameter name="timeout" exists-action="override">
+            <value>60</value>
+        </set-query-parameter>
+        <set-query-parameter name="api-version" exists-action="override">
+            <value>2014-01</value>
+        </set-query-parameter>
+        <!-- Imposta l'header Content-Type -->
+        <set-header name="Content-Type" exists-action="override">
+            <value>application/atom+xml;type=entry;charset=utf-8</value>
+        </set-header>
+        <!-- Trasferisce il corpo della richiesta (preservando il contenuto) -->
+        <set-body>@(context.Request.Body.As&lt;string&gt;(preserveContent: true))</set-body>
+    </inbound>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+    <backend>
+        <base />
+    </backend>
+</policies>

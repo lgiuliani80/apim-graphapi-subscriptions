@@ -1,0 +1,98 @@
+<!--
+    Disclaimer
+    The sample scripts are not supported under any Microsoft standard support program or service. The sample scripts are provided AS IS without warranty of any kind. Microsoft further disclaims all implied warranties including, without limitation, any implied warranties of merchantability or of fitness for a particular purpose. The entire risk arising out of the use or performance of the sample scripts and documentation remains with you. In no event shall Microsoft, its authors, or anyone else involved in the creation, production, or delivery of the scripts be liable for any damages whatsoever (including, without limitation, damages for loss of business profits, business interruption, loss of business information, or other pecuniary loss) arising out of the use of or inability to use the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages.
+-->
+
+<policies>
+    <!-- Gestisci la richiesta in ingresso -->
+    <inbound>
+        <base />
+        <!-- Parametrizzazione del tenantId -->
+        <set-variable name="tenantIdExpected" value="{{GraphAPI-TenantId}}" />
+        <!-- Verifica se validationToken è presente -->
+        <choose>
+            <when condition="@(context.Request.Url.Query.GetValueOrDefault(&quot;validationToken&quot;) != null)">
+                <!-- Verifica se tenantId è presente nella query -->
+                <choose>
+                    <when condition="@(context.Request.Url.Query.GetValueOrDefault(&quot;tenantId&quot;) != null)">
+                        <!-- Confronta tenantId con il valore parametrizzato -->
+                        <choose>
+                            <when condition="@(System.Net.WebUtility.UrlDecode(context.Request.Url.Query.GetValueOrDefault(&quot;tenantId&quot;)) == context.Variables.GetValueOrDefault&lt;string&gt;(&quot;tenantIdExpected&quot;))">
+                                <!-- Il tenantId è corretto, prosegui -->
+                                <return-response>
+                                    <set-status code="200" reason="OK" />
+                                    <set-header name="Content-Type" exists-action="override">
+                                        <value>text/plain</value>
+                                    </set-header>
+                                    <set-body>@(System.Net.WebUtility.UrlDecode(context.Request.Url.Query.GetValueOrDefault("validationToken")))</set-body>
+                                </return-response>
+                            </when>
+                            <otherwise>
+                                <!-- Il tenantId non è corretto, blocca la chiamata con un errore 401 -->
+                                <return-response>
+                                    <set-status code="401" reason="Unauthorized" />
+                                    <set-body />
+                                </return-response>
+                            </otherwise>
+                        </choose>
+                    </when>
+                    <otherwise>
+                        <!-- 
+                        <return-response>
+                            <set-status code="401" reason="Unauthorized" />
+                            <set-body />
+                        </return-response>
+                        -->
+                        <!-- Il tenantId non è presente, prosegui -->
+                        <return-response>
+                            <set-status code="200" reason="OK" />
+                            <set-header name="Content-Type" exists-action="override">
+                                <value>text/plain</value>
+                            </set-header>
+                            <set-body>@(System.Net.WebUtility.UrlDecode(context.Request.Url.Query.GetValueOrDefault("validationToken")))</set-body>
+                        </return-response>
+                    </otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                <!-- Nessun validationToken, verifica clientState nel body -->
+                <set-variable name="clientState" value="@((string)context.Request.Body.As&lt;JObject&gt;(preserveContent: true)[&quot;value&quot;][0][&quot;clientState&quot;])" />
+                <set-variable name="clientStateExpected" value="{{ClientState}}" />
+                <choose>
+                    <when condition="@(context.Variables[&quot;clientState&quot;] != null)">
+                        <!-- Estrai e fai il trace del valore clientState -->
+                        <!-- Verifica se clientState corrisponde al valore atteso -->
+                        <choose>
+                            <when condition="@(context.Variables.GetValueOrDefault&lt;string&gt;(&quot;clientState&quot;) == context.Variables.GetValueOrDefault&lt;string&gt;(&quot;clientStateExpected&quot;))">
+                                <!-- Il clientState è corretto, prosegui -->
+                            </when>
+                            <otherwise>
+                                <!-- Il clientState non corrisponde, rispondi con errore 401 -->
+                                <return-response>
+                                    <set-status code="401" reason="Unauthorized" />
+                                    <set-body />
+                                </return-response>
+                            </otherwise>
+                        </choose>
+                    </when>
+                    <otherwise>
+                        <!-- Nessun validationToken e clientState non presente, rispondi con errore 401 -->
+                        <return-response>
+                            <set-status code="401" reason="Unauthorized" />
+                            <set-body />
+                        </return-response>
+                    </otherwise>
+                </choose>
+            </otherwise>
+        </choose>
+    </inbound>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+    <backend>
+        <base />
+    </backend>
+</policies>

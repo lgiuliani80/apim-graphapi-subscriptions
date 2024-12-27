@@ -1,0 +1,120 @@
+<!--
+    Disclaimer
+    The sample scripts are not supported under any Microsoft standard support program or service. The sample scripts are provided AS IS without warranty of any kind. Microsoft further disclaims all implied warranties including, without limitation, any implied warranties of merchantability or of fitness for a particular purpose. The entire risk arising out of the use or performance of the sample scripts and documentation remains with you. In no event shall Microsoft, its authors, or anyone else involved in the creation, production, or delivery of the scripts be liable for any damages whatsoever (including, without limitation, damages for loss of business profits, business interruption, loss of business information, or other pecuniary loss) arising out of the use of or inability to use the sample scripts or documentation, even if Microsoft has been advised of the possibility of such damages.
+-->
+
+<policies>
+    <inbound>
+        <base />
+        <choose>
+            <!-- Gestione dell'evento "reauthorizationRequired" -->
+            <when condition="@(context.Request.Body.As&lt;JObject&gt;(preserveContent: true)?[&quot;value&quot;]?[0]?[&quot;lifecycleEvent&quot;]?.ToString() == &quot;reauthorizationRequired&quot;)">
+                <!-- 1. Parametrizzazione di client_id e client_secret -->
+                <set-variable name="tenantId" value="{{GraphAPI-TenantId}}" />
+                <set-variable name="clientId" value="{{GraphAPI-ClientId}}" />
+                <set-variable name="clientCertificate" value="{{GraphAPI-Certificate}}" />
+                <!-- 2. Richiesta di un token di accesso tramite client credentials -->
+                <send-request ignore-error="true" timeout="20" response-variable-name="bearerToken" mode="new">
+                    <set-url>https://login.microsoftonline.com/{{GraphAPI-TenantId}}/oauth2/v2.0/token</set-url>
+                    <set-method>POST</set-method>
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/x-www-form-urlencoded</value>
+                    </set-header>
+                    <set-body><![CDATA[@{
+                        var clientCertificate = new X509Certificate2(Convert.FromBase64String(context.Variables.GetValueOrDefault<string>("clientCertificate")));
+
+                        var jwt_h = new JObject(
+                            new JProperty("alg", "RS256"),
+                            new JProperty("typ", "JWT"),
+                            new JProperty("x5t#S256", Convert.ToBase64String(clientCertificate.GetCertHash(HashAlgorithmName.SHA256)).Replace("+", "-").Replace("/", "_").Replace("=", ""))
+                        );
+
+                        var jwt_claims = new JObject(
+                            new JProperty("iss", context.Variables.GetValueOrDefault<string>("clientId")),
+                            new JProperty("aud", "https://login.microsoftonline.com/" + context.Variables.GetValueOrDefault<string>("tenantId") + "/oauth2/v2.0/token"),
+                            new JProperty("nbt", DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+                            new JProperty("exp", DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 300),
+                            new JProperty("jti", Guid.NewGuid().ToString()),
+                            new JProperty("sub", context.Variables.GetValueOrDefault<string>("clientId")),
+                            new JProperty("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                        );
+                        
+                        var jwt_h_b64url = Convert.ToBase64String(Encoding.UTF8.GetBytes(jwt_h.ToString(Formatting.None))).Replace("+", "-").Replace("/", "_").Replace("=", "");
+                        var jwt_claims_b64url = Convert.ToBase64String(Encoding.UTF8.GetBytes(jwt_claims.ToString(Formatting.None))).Replace("+", "-").Replace("/", "_").Replace("=", "");
+                        var toSign = Encoding.UTF8.GetBytes(jwt_h_b64url + "." + jwt_claims_b64url);
+
+                        var rsa = clientCertificate.GetRSAPrivateKey();
+                        var signature = rsa.SignData(toSign, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                        var signature_b64url = Convert.ToBase64String(signature).Replace("+", "-").Replace("/", "_").Replace("=", "");
+
+                        var clientAssertion = jwt_h_b64url + "." + jwt_claims_b64url + "." + signature_b64url;
+
+                        return string.Format(
+                            "client_id={0}&scope=https://graph.microsoft.com/.default&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer&client_assertion={1}&grant_type=client_credentials",
+                            context.Variables.GetValueOrDefault<string>("clientId"),
+                            clientAssertion
+                        );
+                    }]]></set-body>
+                </send-request>
+                <!-- 3. Gestione errori nella chiamata per ottenere il token -->
+                <choose>
+                    <when condition="@(context.Variables.GetValueOrDefault&lt;IResponse&gt;(&quot;bearerToken&quot;)?.StatusCode != 200)">
+                        <return-response>
+                            <set-status code="500" reason="Internal Server Error" />
+                            <set-body>@("Error fetching token: " + context.Variables.GetValueOrDefault&lt;IResponse&gt;(&quot;bearerToken&quot;)?.Body.As&lt;string&gt;())</set-body>
+                        </return-response>
+                    </when>
+                </choose>
+                <!-- 4. Estrai subscriptionId e calcola la nuova data di scadenza -->
+                <set-variable name="subscriptionId" value="@((string)context.Request.Body.As&lt;JObject&gt;(preserveContent: true)[&quot;value&quot;][0][&quot;subscriptionId&quot;])" />
+                <set-variable name="newExpirationDate" value="@(DateTime.UtcNow.AddMinutes(59).ToString(&quot;yyyy-MM-ddTHH:mm:ss.fffZ&quot;))" />
+                <set-variable name="subscriptionUrlPrefix" value="https://graph.microsoft.com/v1.0/subscriptions/" />
+                <set-variable name="patchUrl" value="@(context.Variables.GetValueOrDefault&lt;string&gt;(&quot;subscriptionUrlPrefix&quot;,&quot;&quot;) + context.Variables.GetValueOrDefault&lt;string&gt;(&quot;subscriptionId&quot;,&quot;&quot;))" />
+                <!-- 5. Invia la richiesta PATCH per rinnovare la subscription -->
+                <send-request mode="new" response-variable-name="patchResponse">
+                    <set-url>@(context.Variables.GetValueOrDefault&lt;string&gt;(&quot;patchUrl&quot;))</set-url>
+                    <set-method>PATCH</set-method>
+                    <set-header name="Authorization" exists-action="override">
+                        <value>@("Bearer " + (String)((IResponse)context.Variables[&quot;bearerToken&quot;]).Body.As&lt;JObject&gt;()[&quot;access_token&quot;])</value>
+                    </set-header>
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>@(new JObject(new JProperty(&quot;expirationDateTime&quot;, context.Variables.GetValueOrDefault&lt;string&gt;(&quot;newExpirationDate&quot;))).ToString(Newtonsoft.Json.Formatting.None))</set-body>
+                </send-request>
+                <!-- 6. Gestione della risposta della chiamata PATCH -->
+                <choose>
+                    <when condition="@(context.Variables.GetValueOrDefault&lt;IResponse&gt;(&quot;patchResponse&quot;)?.StatusCode != 200)">
+                        <return-response>
+                            <set-status code="500" reason="Internal Server Error" />
+                            <set-body>@("Error renewing subscription: " + context.Variables.GetValueOrDefault&lt;IResponse&gt;("patchResponse")?.Body.As&lt;string&gt;())</set-body>
+                        </return-response>
+                    </when>
+                    <otherwise>
+                        <return-response>
+                            <set-status code="202" reason="Accepted" />
+                            <set-body>@(context.Variables.GetValueOrDefault&lt;IResponse&gt;("patchResponse")?.Body.As&lt;string&gt;())</set-body>
+                        </return-response>
+                    </otherwise>
+                </choose>
+            </when>
+            <!-- Caso alternativo: evento diverso da "reauthorizationRequired" -->
+            <when condition="@(context.Request.Body.As&lt;JObject&gt;(preserveContent: true)?[&quot;value&quot;]?[0]?[&quot;lifecycleEvent&quot;]?.ToString() != &quot;reauthorizationRequired&quot;)">
+                <set-status code="202" reason="Accepted" />
+            </when>
+        </choose>
+    </inbound>
+    <outbound>
+        <base />
+    </outbound>
+    <!-- Gestione errori generici -->
+    <on-error>
+        <return-response>
+            <set-status code="500" reason="Internal Server Error" />
+            <set-body>@("An unexpected error occurred.")</set-body>
+        </return-response>
+    </on-error>
+    <backend>
+        <base />
+    </backend>
+</policies>

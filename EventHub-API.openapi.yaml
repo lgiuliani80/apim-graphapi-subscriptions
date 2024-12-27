@@ -1,0 +1,35 @@
+openapi: 3.0.1
+info:
+  title: EventHub API
+  description: ''
+  version: '1.0'
+servers:
+  - url: https://httpbin.org/   # Fake URL - actual backend URL will be always overridden in APIM policies
+paths:
+  /subscription:
+    post:
+      summary: subscription
+      operationId: subscription
+      responses:
+        '200':
+          description: 
+  /lifecycle:
+    post:
+      summary: lifecycle
+      operationId: lifecycle
+      responses:
+        '200':
+          description: 
+components:
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
+security:
+  - apiKeyHeader: [ ]
+  - apiKeyQuery: [ ]

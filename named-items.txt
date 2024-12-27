@@ -1,0 +1,6 @@
+ClientState
+GraphAPI-TenantId
+GraphAPI-ClientId
+GraphAPI-Certificate
+EventHub-Namespace
+EventHub-Name
