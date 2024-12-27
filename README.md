@@ -17,4 +17,18 @@
 7. Click on "POST lifecycle". In the "Inbound processing" section, click on the policy XML editor and replace all the text with the content of the `lifecycle-policy.xml`. Click on "Save" button to save the policy.
 8. Click on "POST subscription". In the "Inbound processing" section, click on the policy XML editor and replace all the text with the content of the `subscription-policy.xml`. Click on "Save" button to save the policy.
 
+## Creating a Graph API subscription for receiving notifications on messages received by a specific user
+
+    POST https://graph.microsoft.com/v1.0/subscriptions
+
+    {
+        "changeType": "created,updated",
+        "notificationUrl": "https://<APIM-INSTANCE-NAME>.azure-api.net/subscription",
+        "lifecycleNotificationUrl": "https://<APIM-INSTANCE-NAME>.azure-api.net/lifecycle",
+        "resource": "users/<YOUR-USERNAME>@<YOUR-DOMAIN>/messages",
+        "expirationDateTime":"2024-12-24T18:00:00Z",
+        "clientState": "MyCustomClientState",
+        "latestSupportedTlsVersion": "v1_2"
+    }
+
 by [Gabriel Mercuri](gmercuri@microsoft.com) and [Luca Giuliani](giulianil@microsoft.com)
