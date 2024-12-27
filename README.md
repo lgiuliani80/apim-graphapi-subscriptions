@@ -38,16 +38,29 @@
 
 ## Creating a Graph API subscription for receiving notifications on messages received by a specific user
 
-    POST https://graph.microsoft.com/v1.0/subscriptions
+`POST https://graph.microsoft.com/v1.0/subscriptions`
 
-    {
-        "changeType": "created,updated",
-        "notificationUrl": "https://<APIM-INSTANCE-NAME>.azure-api.net/subscription",
-        "lifecycleNotificationUrl": "https://<APIM-INSTANCE-NAME>.azure-api.net/lifecycle",
-        "resource": "users/<YOUR-USERNAME>@<YOUR-DOMAIN>/messages",
-        "expirationDateTime":"2024-12-24T18:00:00Z",
-        "clientState": "MyCustomClientState",
-        "latestSupportedTlsVersion": "v1_2"
-    }
+```json
+{
+    "changeType": "created,updated",
+    "notificationUrl": "https://<APIM-INSTANCE-NAME>.azure-api.net/subscription",
+    "lifecycleNotificationUrl": "https://<APIM-INSTANCE-NAME>.azure-api.net/lifecycle",
+    "resource": "users/<YOUR-USERNAME>@<YOUR-DOMAIN>/messages",
+    "expirationDateTime":"2024-12-24T18:00:00Z",
+    "clientState": "MyCustomClientState",
+    "latestSupportedTlsVersion": "v1_2"
+}
+```
 
+## Permissions recap
+
+- **User issuing the initial Graph API subscription request**:  
+  - User must have `Mail.Read` delegated permission on `Mail` resource AND must have access to the specificed mailbox
+- **Graph API App Registration**:  
+  - Graph API _Application_ permission on `Mail.Read` on `Mail` resource
+- **API Management Managed Identity**:  
+  - `Key Vault Secret User` role on the Key Vault where the certificate is stored and necessary permissions on the Event Hub namespace
+  - `Azure Event Hubs Data Owner` role on the Event Hub
+
+---
 by [Gabriel Mercuri](gmercuri@microsoft.com) and [Luca Giuliani](giulianil@microsoft.com)
