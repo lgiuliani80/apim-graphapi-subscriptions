@@ -39,8 +39,8 @@
                             new JProperty("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds())
                         );
                         
-                        var jwt_h_b64url = Convert.ToBase64String(Encoding.UTF8.GetBytes(jwt_h.ToString(Formatting.None))).Replace("+", "-").Replace("/", "_").Replace("=", "");
-                        var jwt_claims_b64url = Convert.ToBase64String(Encoding.UTF8.GetBytes(jwt_claims.ToString(Formatting.None))).Replace("+", "-").Replace("/", "_").Replace("=", "");
+                        var jwt_h_b64url = Convert.ToBase64String(Encoding.UTF8.GetBytes(jwt_h.ToString(NewtonSoft.Json.Formatting.None))).Replace("+", "-").Replace("/", "_").Replace("=", "");
+                        var jwt_claims_b64url = Convert.ToBase64String(Encoding.UTF8.GetBytes(jwt_claims.ToString(NewtonSoft.Json.Formatting.None))).Replace("+", "-").Replace("/", "_").Replace("=", "");
                         var toSign = Encoding.UTF8.GetBytes(jwt_h_b64url + "." + jwt_claims_b64url);
 
                         var rsa = clientCertificate.GetRSAPrivateKey();
